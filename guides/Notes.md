@@ -5,6 +5,14 @@
   - [What is Agentic AI?](#what-is-agentic-ai)
   - [What are Workflows?](#what-is-workflow)
 - [AI APIs & Ollama](#ai-apis--ollama)
+- [Workflow Design Patterns](#workflow-design-patterns)
+  - [Prompt Chaining](#1-prompt-chaining)
+  - [Routing](#routing)
+  - [Parallelization](#parallelization)
+  - [Orchestrator-Workers](#orchestrator-workers)
+  - [Evaluator-Optimizer (or Reflection Pattern)](#evaluator-optimizer-or-reflection-pattern)
+  - [Tool Use Pattern](#tool-use-pattern)
+  - [Multi-Agent Collaboration](#multi-agent-collaboration)
 
 ## Introduction
 
@@ -115,3 +123,221 @@ Openrouter
 How to choose LLMs: A Developer's guide to LLMs
 
 - [How to choose LLMs: A Developer's guide to LLMs](https://www.youtube.com/watch?v=pYax2rupKEY)
+
+## Workflow Design Patterns
+
+![Workflow Design Patterns](../assets/workflows_design_patterns.png)
+
+### Prompt Chaining
+
+Decomposes a task into a sequence of steps, where each LLM call processes the output of the previous one
+
+**Example:**
+
+- Generate marketing copy → Check if it meets brand guidelines → Translate to different language → Format for social media
+- Like an assembly line where each worker adds something to the product
+
+### Routing
+
+Classifies an input and directs it to a specialized followup task. Here, LLM handles the routing.
+
+**Example:**
+
+- Customer query comes in → AI determines if it's "billing," "technical," or "general" → Routes to specialized agent
+- Like a hospital receptionist directing patients to the right department
+
+### Parallelization
+
+LLMs can sometimes work simultaneously on a task and have their outputs aggregated **_programmatically_**. This workflow, parallelization, manifests in two key variations:
+
+- Sectioning: Breaking a task into independent subtasks run in parallel.
+- Voting: Running the same task multiple times to get diverse outputs.
+
+As mentioned in above image, the coordinator and aggregator are the programs (may be Python or other) which initiates parallelization and process (aggregate) the result respetively.
+
+**Example:**
+
+- Sectioning: Review contract → One agent checks legal terms, another checks financials, third checks dates (all at once)
+- Voting: Three agents independently review code for security issues, majority vote decides
+
+### Orchestrator-Workers
+
+A central LLM dynamically breaks down tasks, delegates them to worker LLMs, and synthesizes their results.
+
+As mentioned in above image, orchestrator and synthesizer are your LLMs
+
+**Example:**
+
+- Build a website → Orchestrator decides: "Need designer for layout, developer for code writer for content" → Assigns each worker → Combines results
+- Like a project manager delegating to team members
+
+### Evaluator-Optimizer (or Reflection Pattern)
+
+One LLM generates a response while another provides evaluation and feedback in a loop.
+
+**Example:**
+
+- Writer agent creates article → Critic agent reviews and suggests improvements → Writer revises → Repeat until quality threshold met
+- Like having a writer and editor working together
+
+### Tool Use Pattern
+
+```mermaid
+flowchart TD
+    A[User Request] --> B[AI Agent Receives Task]
+    B --> C{Analyze Task Requirements}
+
+    C --> D[Identify Needed Tools]
+    D --> E{Tool Available?}
+
+    E -->|No| F[Report Missing Tool/Error]
+    E -->|Yes| G[Select Appropriate Tool]
+
+    G --> H[Prepare Tool Parameters]
+    H --> I[Execute Tool Call]
+    I --> J[Receive Tool Response]
+
+    J --> K{Tool Call Successful?}
+
+    K -->|No| L[Handle Error/Retry]
+    L --> M{Retry Possible?}
+    M -->|Yes| H
+    M -->|No| N[Report Tool Failure]
+
+    K -->|Yes| O[Process Tool Results]
+    O --> P{Task Complete?}
+
+    P -->|No| Q{Need Additional Tools?}
+    Q -->|Yes| D
+    Q -->|No| R[Continue with Current Data]
+
+    P -->|Yes| S[Compile Final Response]
+    R --> S
+
+    S --> T[Return Results to User]
+
+    F --> U[End - Error State]
+    N --> U
+    T --> V[End - Success]
+
+    style A fill:#e1f5fe,color:#0d47a1
+    style T fill:#c8e6c9,color:#1b5e20
+    style U fill:#ffcdd2,color:#b71c1c
+    style V fill:#c8e6c9,color:#1b5e20
+    style C fill:#fff3e0,color:#e65100
+    style E fill:#fff3e0,color:#e65100
+    style K fill:#fff3e0,color:#e65100
+    style P fill:#fff3e0,color:#e65100
+    style Q fill:#fff3e0,color:#e65100
+    style M fill:#fff3e0,color:#e65100
+```
+
+Agents access external tools and APIs to accomplish tasks.
+
+**Example:**
+
+- Research agent uses Google search → Wikipedia lookup → PDF reader → Database query → Email tool to send findings
+
+### Multi-Agent Collaboration
+
+```mermaid
+flowchart TD
+    A[User Request] --> B[Coordinator Agent]
+    B --> C{Analyze Task Complexity}
+
+    C -->|Simple Task| D[Single Agent Assignment]
+    C -->|Complex Task| E[Multi-Agent Required]
+
+    E --> F[Task Decomposition]
+    F --> G[Identify Required Expertise]
+    G --> H[Select Specialized Agents]
+
+    H --> I[Agent 1<br/>Research/Data]
+    H --> J[Agent 2<br/>Analysis/Logic]
+    H --> K[Agent 3<br/>Creation/Output]
+    H --> L[Agent N<br/>Review/QA]
+
+    I --> M[Execute Task 1]
+    J --> N[Execute Task 2]
+    K --> O[Execute Task 3]
+    L --> P[Execute Task N]
+
+    M --> Q{Task 1 Complete?}
+    N --> R{Task 2 Complete?}
+    O --> S{Task 3 Complete?}
+    P --> T{Task N Complete?}
+
+    Q -->|No| U[Agent 1 Retry/Refine]
+    R -->|No| V[Agent 2 Retry/Refine]
+    S -->|No| W[Agent 3 Retry/Refine]
+    T -->|No| X[Agent N Retry/Refine]
+
+    U --> M
+    V --> N
+    W --> O
+    X --> P
+
+    Q -->|Yes| Y[Result 1]
+    R -->|Yes| Z[Result 2]
+    S -->|Yes| AA[Result 3]
+    T -->|Yes| BB[Result N]
+
+    Y --> CC[Coordinator Agent<br/>Result Integration]
+    Z --> CC
+    AA --> CC
+    BB --> CC
+
+    CC --> DD{Integration Successful?}
+    DD -->|No| EE[Request Agent Revisions]
+    DD -->|Yes| FF[Quality Check]
+
+    EE --> GG{Which Agents Need Revision?}
+    GG --> I
+    GG --> J
+    GG --> K
+    GG --> L
+
+    FF --> HH{Quality Meets Standards?}
+    HH -->|No| II[Coordinator Refinement]
+    HH -->|Yes| JJ[Final Output Assembly]
+
+    II --> CC
+    JJ --> KK[Deliver to User]
+
+    D --> LL[Single Agent Execution]
+    LL --> MM{Task Complete?}
+    MM -->|No| NN[Agent Retry]
+    MM -->|Yes| JJ
+    NN --> LL
+
+    KK --> OO[End - Success]
+
+    style A fill:#e1f5fe,color:#0d47a1
+    style B fill:#f3e5f5,color:#4a148c
+    style CC fill:#f3e5f5,color:#4a148c
+    style I fill:#e8f5e8,color:#1b5e20
+    style J fill:#fff3e0,color:#e65100
+    style K fill:#e3f2fd,color:#0d47a1
+    style L fill:#fce4ec,color:#880e4f
+    style KK fill:#c8e6c9,color:#1b5e20
+    style OO fill:#c8e6c9,color:#1b5e20
+    style C fill:#fff3e0,color:#e65100
+    style DD fill:#fff3e0,color:#e65100
+    style HH fill:#fff3e0,color:#e65100
+    style Q fill:#fff3e0,color:#e65100
+    style R fill:#fff3e0,color:#e65100
+    style S fill:#fff3e0,color:#e65100
+    style T fill:#fff3e0,color:#e65100
+```
+
+Different specialized agents work together on complex tasks.
+
+**Example:**
+
+- Sales process: Lead qualifier agent → Demo scheduler agent → Proposal writer agent → Follow-up agent
+
+Readings:
+
+- [Building effective agents](http://anthropic.com/engineering/building-effective-agents)
+- [7 Practical Design Patterns for Agentic Systems](https://www.mongodb.com/resources/basics/artificial-intelligence/agentic-systems)
+- [Zero to One: Learning Agentic Patterns](https://www.philschmid.de/agentic-pattern)
