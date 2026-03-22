@@ -14,6 +14,7 @@
   - [Tool Use Pattern](#tool-use-pattern)
   - [Multi-Agent Collaboration](#multi-agent-collaboration)
   - [Lab: Multi Model Orchestration - Creating a system to evaluate AI responses](#lab-multi-model-orchestration---creating-a-system-to-evaluate-ai-responses)
+- [Agentic AI Frameworks](#agentic-ai-frameworks)
 
 ## Introduction
 
@@ -346,3 +347,51 @@ Readings:
 ### Lab: Multi Model Orchestration - Creating a system to evaluate AI responses
 
 [LLM Contest](./code/001-week-1/002-llm-contest.py)
+
+## Agentic AI Frameworks
+
+### What Are Agentic AI Frameworks?
+
+Frameworks that provide glue/abstraction code to simplify interacting with LLMs, letting developers focus on business problems rather than low-level API details. The landscape is large and evolving rapidly.
+
+### Framework Complexity Hierarchy
+
+#### Level 1 — No Framework (Direct API)
+
+- Connect directly to LLMs via their APIs
+- Full control over prompts and orchestration
+- You see exactly what's happening under the hood
+- **Anthropic's recommendation**: Their blog post _"Building Effective Agents"_ makes a compelling case for always going direct
+
+##### MCP (Model Context Protocol)
+
+- Created by Anthropic; grouped with "no framework" because it's a **protocol, not a framework**
+- Open source standard for connecting models to data sources and tools
+- No glue code needed — just conform to the protocol
+- Enables elegant, vendor-agnostic stitching of models and providers
+
+#### Level 2 — Lightweight Frameworks
+
+| Framework             | Notes                                                                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| **OpenAI Agents SDK** | Very new, lightweight, clean, flexible. API still evolving rapidly.                                      |
+| **CrewAI**            | Slightly more mature, easy to use, low-code/YAML-driven configuration, slightly heavier than OpenAI SDK. |
+
+Both frameworks stay out of the way — you still feel like you're just working with LLMs.
+
+#### Level 3 — Heavyweight Frameworks
+
+| Framework     | Notes                                                                                                    |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| **LangGraph** | From the LangChain team. Models agents as a computational graph. Very powerful but steep learning curve. |
+| **AutoGen**   | From Microsoft. Also relatively heavy; encompasses multiple concepts/modes.                              |
+
+With these, the **framework ecosystem takes over the project** — it becomes a "LangGraph project" more than an "agentic AI project." Greater power, but greater buy-in required.
+
+### Choosing a Framework
+
+Picking the right framework depends on:
+
+- **Use case** — different platforms suit different business objectives
+- **Personal/team preference** — comfort with abstractions and ecosystems
+- **Trade-off appetite** — simplicity & flexibility vs. power & structure
