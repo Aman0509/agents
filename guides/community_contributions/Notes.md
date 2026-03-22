@@ -13,6 +13,7 @@
   - [Evaluator-Optimizer (or Reflection Pattern)](#evaluator-optimizer-or-reflection-pattern)
   - [Tool Use Pattern](#tool-use-pattern)
   - [Multi-Agent Collaboration](#multi-agent-collaboration)
+  - [Lab: Multi Model Orchestration - Creating a system to evaluate AI responses](#lab-multi-model-orchestration---creating-a-system-to-evaluate-ai-responses)
 
 ## Introduction
 
@@ -341,3 +342,7 @@ Readings:
 - [Building effective agents](http://anthropic.com/engineering/building-effective-agents)
 - [7 Practical Design Patterns for Agentic Systems](https://www.mongodb.com/resources/basics/artificial-intelligence/agentic-systems)
 - [Zero to One: Learning Agentic Patterns](https://www.philschmid.de/agentic-pattern)
+
+### Lab: Multi Model Orchestration - Creating a system to evaluate AI responses
+
+[LLM Contest](./code/001-week-1/002-llm-contest.py)
