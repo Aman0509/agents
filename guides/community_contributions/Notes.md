@@ -15,6 +15,7 @@
   - [Multi-Agent Collaboration](#multi-agent-collaboration)
   - [Lab: Multi Model Orchestration - Creating a system to evaluate AI responses](#lab-multi-model-orchestration---creating-a-system-to-evaluate-ai-responses)
 - [Agentic AI Frameworks](#agentic-ai-frameworks)
+- [MCP vs Agent Skills](#mcp-vs-agent-skills)
 
 ## Introduction
 
@@ -460,3 +461,211 @@ In more complex agents, the LLM may call tools multiple times in a loop before r
 | Mechanism | Injected into the prompt                | LLM emits JSON → your code runs it   |
 | LLM calls | One                                     | Two or more                          |
 | Examples  | Ticket prices, FAQs, past conversations | SQL query, send email, toggle lights |
+
+## MCP vs Agent Skills
+
+### 1. Why Tools & Context Matter?
+
+AI models are getting increasingly capable (near-perfect on GPQA, ~80% on SWE-bench), but **intelligence alone isn't enough**. A model is only as useful as the tools and context it's given.
+
+> **Example:** Asking an LLM to "review my codebase for bugs" fails without:
+>
+> - Access to your GitHub repo (tool)
+> - A code interpreter to actually _run_ the code (tool)
+> - Your team's coding standards (context)
+
+This need for structured tool/context delivery gave rise to two complementary patterns: **MCP** and **Agent Skills**.
+
+### 2. Model Context Protocol (MCP)
+
+#### What It Is
+
+MCP (released **November 2024** by Anthropic) is an **open standard** — a universal protocol for giving LLMs access to tools and external data sources. It's often described as the **"USB-C port of AI applications"**.
+
+#### How It Works — Client-Server Architecture
+
+```
+┌─────────────────────────────┐         ┌────────────────────────────┐
+│       AI Application        │         │        MCP Server          │
+│  (Claude, ChatGPT, Cursor)  │         │                            │
+│                             │  req    │  ┌──────────────────────┐  │
+│   ┌──────────────────────┐  │ ──────► │  │  Tools               │  │
+│   │    MCP Client        │  │         │  │  (web search, files) │  │
+│   └──────────────────────┘  │  resp   │  ├──────────────────────┤  │
+│                             │ ◄─────  │  │  Resources (DBs)     │  │
+└─────────────────────────────┘         │  ├──────────────────────┤  │
+                                        │  │  Prompts             │  │
+                                        │  └──────────────────────┘  │
+                                        └────────────────────────────┘
+```
+
+The client first asks the server to **list all available tools** along with their schemas. The LLM then decides which tools to invoke based on the task.
+
+#### Why MCP Exists
+
+Without MCP, every AI app would need custom integrations for every tool, and every tool (Notion, Gmail, Slack) would need to build integrations for every AI app — a combinatorial nightmare. MCP solves this with **one universal protocol**.
+
+```mermaid
+graph LR
+    A[Claude] --> Z[MCP]
+    B[ChatGPT] --> Z
+    C[Cursor] --> Z
+    Z --> D[Gmail]
+    Z --> E[Notion]
+    Z --> F[Slack]
+    Z --> G[Web Search]
+    Z --> H[GitHub]
+```
+
+#### The Problem: Context Rot
+
+When an MCP server initializes, **all tool schemas are injected into the context window upfront** — even tools irrelevant to the current task. This causes:
+
+- 💸 **Higher costs** — more tokens per request
+- 🧠 **Degraded performance** — irrelevant context confuses the model
+- 📉 **Context rot** — the model's effective reasoning degrades with bloated context
+
+### 3. Agent Skills
+
+#### The Gap MCP Couldn't Fill
+
+1. **Stuffing it all in the System Prompt:** The most common approach. Developers would write detailed instructions directly into the system prompt — step-by-step workflows, formatting rules, domain knowledge, etc. The problem: the system prompt has a fixed size, and everything was loaded always, whether relevant or not. Classic context rot.
+
+2. **Hardcoded Prompt Templates in the MCP Server itself:** MCP servers support a "prompts" resource (alongside tools and resources). Developers would bake workflow instructions directly into the server as named prompt templates. The LLM could request them, but this was rigid — instructions were tied to the server, not easily editable by non-developers, and still fairly blunt as a context management strategy.
+
+3. **Resources in the MCP Server:** MCP servers also support "resources" — basically readable documents like docs, wikis, or knowledge bases the LLM could fetch. Some teams stored workflow guides here. But the LLM had to know to ask for them, and there was no standardized way to surface what was available or when to use it.
+
+4. **Just hoping the model figured it out:** Honestly, a lot of early MCP setups just gave the agent the tools and trusted the model's general reasoning to figure out the workflow. This worked for simple tasks but fell apart for anything with multiple steps, specific ordering, or domain-specific logic.
+
+#### What They Are
+
+Agent Skills are **folders containing plain-English instructions** that an agent loads _on demand_. Think of them as modular, lazy-loaded knowledge packages.
+
+```
+my-skill/
+├── SKILL.md          ← Main skill file (front matter + body)
+├── references/       ← Documentation, specs
+├── assets/           ← Templates, resources
+└── scripts/          ← Executable Python/JS code
+```
+
+#### Anatomy of a Skill File
+
+```markdown
+---
+name: validate-saas-ideas
+description: Helps evaluate and validate SaaS product ideas using a structured framework.
+tools: [web_search, notion]
+---
+
+#### Instructions
+
+1. Ask the user to describe their SaaS idea in one sentence.
+2. Research the competitive landscape using web search.
+3. Evaluate against the following criteria:
+   - Market size
+   - Pain point severity
+   - Existing solutions
+4. Create a Notion page with findings structured as: ...
+```
+
+The **front matter** (metadata) is loaded at startup (~100 tokens).  
+The **body** is only loaded if the agent decides this skill is relevant (~up to 5,000 tokens).  
+**Scripts and reference files** are fetched only when needed (virtually unlimited).
+
+#### Progressive Disclosure
+
+This is the core principle behind Skills — give the agent _only the context it needs for the next step_.
+
+```
+Startup         → Skill metadata only          (~100 tokens each)
+Skill triggered → Full skill body loaded        (~up to 5,000 tokens)
+Task execution  → Reference files / scripts     (as needed, no limit)
+```
+
+```mermaid
+flowchart TD
+    A[Agent Starts] --> B[Load all skill front matter\n~100 tokens × N skills]
+    B --> C{Is Skill 3 relevant?}
+    C -- No --> D[Ignore body]
+    C -- Yes --> E[Load Skill 3 body\n~5,000 tokens]
+    E --> F{Need reference files\nor scripts?}
+    F -- Yes --> G[Load files / run scripts]
+    F -- No --> H[Execute task]
+    G --> H
+```
+
+---
+
+### 4. MCP vs Agent Skills — Side-by-Side Comparison
+
+| Feature                | MCP                                           | Agent Skills                                           |
+| ---------------------- | --------------------------------------------- | ------------------------------------------------------ |
+| **Primary purpose**    | Give tools & external data access             | Give instructions & executable context                 |
+| **Standard**           | Open standard, widely adopted                 | Open standard (released ~early 2025), growing adoption |
+| **Context loading**    | All tool schemas injected at startup          | Progressive disclosure — loaded as needed              |
+| **What the LLM needs** | MCP client + tool-calling ability             | File system access + code interpreter                  |
+| **Custom creation**    | Requires writing code (server implementation) | Plain English / Markdown                               |
+| **Best for**           | Connecting to external services               | Encoding task-specific workflows                       |
+| **Context efficiency** | Lower (potential context rot)                 | Higher (lazy loading)                                  |
+
+---
+
+### 5. When to Use Which
+
+> **Rule of thumb:** MCP = tool access. Skills = task instructions.
+
+#### Use MCP When You Need To:
+
+- Connect to an external service (Gmail, Notion, Slack, GitHub)
+- Give the agent real-time capabilities (web search, code execution)
+- Provide structured data access (databases, APIs)
+
+#### Use Agent Skills When You Need To:
+
+- Encode a multi-step workflow specific to your use case
+- Guide the agent on _how_ to use tools (not just _that_ tools exist)
+- Manage large amounts of reference material efficiently
+- Reduce unnecessary context without losing capability
+
+#### Practical Example — Notion
+
+```
+MCP (Notion server)         → gives the agent 15 tools to read/write pages
+                              but the agent doesn't know YOUR workflow
+
+Agent Skill (analyze-interviews.md) → tells the agent:
+  1. Pull pages tagged "User Interview" from Notion
+  2. Extract pain points and themes
+  3. Cross-reference with existing features doc
+  4. Create a summary page in /Research/Synthesis/
+```
+
+**They are complementary, not competing.**
+
+### 6. MCP + Skills Together — The Full Picture
+
+```mermaid
+flowchart LR
+    User -->|Task| Agent
+    Agent -->|Tool calls| MCP_Server[MCP Server\nNotion · Gmail · Web Search]
+    Agent -->|Reads instructions| Skills[Agent Skills\nWorkflow Guides · Scripts]
+    MCP_Server -->|Data & actions| Agent
+    Skills -->|Context on demand| Agent
+    Agent -->|Result| User
+```
+
+### 7. Key Takeaways
+
+1. **MCP** solves the integration problem — one protocol to connect AI apps to any tool.
+2. **Skills** solve the context problem — structured, lazy-loaded instructions that avoid context rot.
+3. The two work **together**: MCP gives the _capability_, Skills give the _strategy_.
+4. Skills require no coding — just well-structured Markdown files.
+5. MCP has wide adoption today; Skills are newer but growing rapidly (following a similar adoption curve to MCP).
+6. The underlying principle of Skills — **progressive disclosure** — is broadly applicable to any agentic system design, even outside of official Skills support.
+
+Readings
+
+- [Anthropic MCP Docs](https://modelcontextprotocol.io)
+- [Anthropic MCP Servers (official)](https://github.com/modelcontextprotocol/servers)
+- [Claude Agent Skills documentation](https://docs.anthropic.com)
