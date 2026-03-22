@@ -395,3 +395,68 @@ Picking the right framework depends on:
 - **Use case** — different platforms suit different business objectives
 - **Personal/team preference** — comfort with abstractions and ecosystems
 - **Trade-off appetite** — simplicity & flexibility vs. power & structure
+
+## Resources vs Tools
+
+### Resources
+
+Resources are additional context or data provided to an LLM to improve its expertise and accuracy for specific tasks.
+
+- The Concept: At its simplest, a resource is just "shoving" relevant data into the prompt. Instead of relying solely on the LLM's pre-trained knowledge, you provide the specific information it needs to answer a query.
+
+- Example: A customer support agent for an airline can be given a list of all current ticket prices within the prompt. When a user asks a question, the agent refers to that specific "resource" to provide a factual answer.
+
+- **Retrieval Augmented Generation (RAG)**:
+  - Since LLM prompts have limits (context windows), you cannot always provide all data at once.
+  - RAG is the advanced technique of using "clever tricks" (often involving other LLMs or vector databases) to find only the most relevant pieces of information and inserting those into the prompt.
+
+- Other Resource types
+  - System prompts: instructions and persona context set at the session level
+  - Few-shot examples: example Q&A pairs that guide the model's output style
+  - Conversation history: earlier messages provide continuity across turns
+  - Structured data: tables, JSON payloads, or API responses embedded in the prompt
+
+### Tools
+
+A tool gives the LLM the ability to do something — not just generate text. The model can decide, at inference time, whether to invoke a tool and which one. This is what gives agents real autonomy.
+
+#### Common tool types
+
+- Data access: SQL queries, API calls, vector DB lookups
+- Computation: calculators, code runners, unit converters
+- Communication: send emails, post to Slack, create tickets
+- Environment control: toggle smart devices, deploy code, call external services
+- Agent-to-agent: one LLM delegating a subtask to another LLM
+
+#### How tool calling actually works ?
+
+The "magic" is mundane: the LLM doesn't directly run code. It outputs a structured JSON message saying which tool it wants to use and with what arguments. Your code reads that, runs the tool, and calls the LLM again with the result.
+
+1. You describe available tools in the prompt (name, description, parameters).
+2. User sends a message. LLM decides if a tool call is needed.
+3. If yes, LLM returns a JSON tool-use response (e.g. fetch_ticket_price("Paris")).
+4. Your code executes the function and captures the result.
+5. You call the LLM a second time, appending the tool result to the conversation.
+6. LLM generates a final natural-language response using that result.
+
+> Under the hood: Most frameworks (OpenAI function calling, Anthropic tool use, LangChain) handle the JSON packaging for you, but that's all that's happening. At its core, it's prompt engineering + an if-statement + a second LLM call.
+
+#### Multi-step / agentic tool use
+
+In more complex agents, the LLM may call tools multiple times in a loop before returning a final answer — this is called a ReAct loop (Reason → Act → Observe → repeat). This is the basis of most autonomous agents.
+
+#### Tool safety considerations
+
+- Validate inputs before executing any tool: never pass LLM output directly to a database or shell without checks.
+- Scope permissions: give tools only the access they need (principle of least privilege).
+- Human-in-the-loop: for irreversible actions (deleting data, sending emails), consider requiring human confirmation.
+- Logging: always log tool calls and their results for debugging and auditing
+
+### Resources vs Tools — Quick Comparison
+
+| Dimension | Resources                               | Tools                                |
+| --------- | --------------------------------------- | ------------------------------------ |
+| Purpose   | Give the LLM more knowledge             | Give the LLM the ability to act      |
+| Mechanism | Injected into the prompt                | LLM emits JSON → your code runs it   |
+| LLM calls | One                                     | Two or more                          |
+| Examples  | Ticket prices, FAQs, past conversations | SQL query, send email, toggle lights |
